@@ -5,6 +5,8 @@ import gurobipy as gp
 from gurobipy import GRB
 
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 L = 100000
 
@@ -18,6 +20,13 @@ class MILPOptimizer:
         M = input_set['input_data']['num_machine']
         J = input_set['input_data']['num_job']
         V = input_set['input_data']['num_AGV']
+        """
+            agv_set[i] is AGV i
+        """
+        self.agv_set = [0]
+        for k in range(1, V + 1):
+            self.agv_set.append(components.AGV(input_set['input_data']['AGV_color'][k - 1]))
+
         """
             operation_set[i][j] is operation of job j in machine i
         """
@@ -190,11 +199,17 @@ class MILPOptimizer:
             Firstly, each AGV need to sort their transportation in order
             Then, the empty trip is their last operation starting time to the next trip
         """
+        # Loop through all transportation and add into agv
+        for i in range(2, len(self.transportation_set)):
+            for j in range(1, len(self.transportation_set[i])):
+                k = self.transportation_set[i][j].getAGV()
+                self.agv_set[k].add_transportation(i, j, self.transportation_set[i][j].start_time.X)
 
-        
+        for k in range(1, len(self.agv_set)):
+            self.agv_set[k].schedule_empty_trip()
 
 
-    def visualize_result(self):
+    def visualize_result(self, mode):
         """
             Create a chart to indicate manufacturing process
         """
@@ -214,8 +229,7 @@ class MILPOptimizer:
         for machine in machines:
             plt.axhline(y=machine, color='gray', linestyle='--', alpha=0.3)
 
-        self.visualize_operation()
-        self.visualize_transportation()
+        self.plot(mode)
 
         # Set labels and title
         plt.xlabel("Time")
@@ -223,45 +237,81 @@ class MILPOptimizer:
         plt.title("Manufacturing schedule chart")
 
         # Show the legend
-        plt.legend()
+        self.create_legend()
 
         # Show the plot
         plt.show()
 
 
-    def visualize_operation(self):
+    def plot(self, mode):
         half_bar_width = 0.1
-        for i in range(1, len(self.operation_set)):
-            for j in range(1, len(self.operation_set[i])):
+        half_space_width = 0.2
+
+        self.visualize_operation_m1()
+
+        for k in range(1, len(self.agv_set)):
+            # Plot operation
+            for transportation in self.agv_set[k].transportation_set:
+                i = transportation[0]
+                j = transportation[1]
                 a = self.operation_set[i][j].start_time.X
                 b = self.operation_set[i][j].start_time.X + self.operation_set[i][j].time
                 plt.fill_betweenx(y=[i - half_bar_width, i + half_bar_width], \
-                                  x1=a, x2=b, color='red', alpha=0.5, edgecolor='black')
+                                  x1=a, x2=b, color=self.agv_set[k].color, alpha=0.3, edgecolor='black')
                 plt.text((a + b) / 2, i, f"Job {j}",ha="center", va="center", fontsize=10)
 
-    
-    def visualize_transportation(self):
-        half_bar_width = 0.2
-        # Get the data limits for x and y axes
-        x_min, x_max = plt.xlim()
-        y_min, y_max = plt.ylim()
+            if mode != k:
+                continue
 
-        # Calculate the scaling factor for the arrowhead
-        scale_factor = (y_max - y_min) / (x_max - x_min)
-        for i in range(2, len(self.transportation_set)):
-            for j in range(1, len(self.transportation_set[i])):
-                # Finding which AGV
-                k = self.transportation_set[i][j].getAGV()
-
+            for transportation in self.agv_set[k].transportation_set:
+                i = transportation[0]
+                j = transportation[1]
                 x_start = self.transportation_set[i][j].start_time.X
-                y_start = i - 1 + half_bar_width
+                y_start = i - 1 + half_space_width
                 x_end = self.transportation_set[i][j].start_time.X + self.travel_time_mtx[i - 1][i]
-                y_end = i - half_bar_width
+                y_end = i - half_space_width
                 dx = self.operation_set[i][j].start_time.X - x_end
                 dy = 0
-                plt.plot([x_start, x_end], [y_start, y_end], linewidth=1.5, color='blue')
-                plt.plot([x_end, x_end + dx], [y_end, y_end + dy], linewidth=1.5, color='blue')
+                plt.plot([x_start, x_end], [y_start, y_end], linewidth=1.5, color=self.agv_set[k].color)
+                plt.plot([x_end, x_end + dx], [y_end, y_end + dy], linewidth=1.5, color=self.agv_set[k].color)
 
-                x_center = (x_start + x_end) / 2
-                y_center = (y_start + y_end) / 2
-                plt.text(x_center - 0.5, y_center + 0.1, f"{k}", ha="center", va="center")
+            for empty_trip in self.agv_set[k].empty_trip_set:
+                i, j = empty_trip[0], empty_trip[1]
+                i_, j_ = empty_trip[2], empty_trip[3]
+
+                sgn = -1 if i >= i - 1 else 1
+
+                x_3 = self.transportation_set[i_][j_].start_time.X
+                y_3 = i_ - 1 - sgn * half_space_width
+                x_2 = self.transportation_set[i_][j_].start_time.X - self.travel_time_mtx[i][i_ - 1]
+                y_2 = i - half_space_width
+                x_1 = self.operation_set[i][j].start_time.X
+                y_1 = i - half_space_width
+
+                plt.plot([x_1, x_2], [y_1, y_2], linewidth=1.5, linestyle='dashed', color=self.agv_set[k].color)
+                plt.plot([x_2, x_3], [y_2, y_3], linewidth=1.5, linestyle='dashed', color=self.agv_set[k].color)
+
+
+    def visualize_operation_m1(self):
+        half_bar_width = 0.1
+        i = 1
+        for j in range(1, len(self.operation_set[i])):
+            a = self.operation_set[i][j].start_time.X
+            b = self.operation_set[i][j].start_time.X + self.operation_set[i][j].time
+            plt.fill_betweenx(y=[i - half_bar_width, i + half_bar_width], \
+                                x1=a, x2=b, color='gray', alpha=0.3, edgecolor='black')
+            plt.text((a + b) / 2, i, f"Job {j}",ha="center", va="center", fontsize=10)
+
+    def create_legend(self):
+        legends = []
+        legends.append(Patch(facecolor='gray', edgecolor='black', alpha=0.3, \
+                             label="Operation without transportation"))
+        for k in range(1, len(self.agv_set)):
+            legends.append(Patch(facecolor=self.agv_set[k].color, edgecolor='black', alpha=0.3, \
+                                 label=f"Operation transported by AGV {k}"))
+            legends.append(Line2D([0], [0], color=self.agv_set[k].color, lw=1, \
+                                  label=f'Transportation by AGV {k}'))
+            legends.append(Line2D([0], [0], color=self.agv_set[k].color, lw=1, \
+                                  label=f'Empty trip by AGV {k}', linestyle="--"))
+
+        plt.legend(handles=legends, loc='lower right')
