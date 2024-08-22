@@ -50,7 +50,8 @@ class Scheduler:
 
     def execute(self):
         self.optimize_engine.solve()
-        self.optimize_engine.visualize_result()
+        for k in range(self.input_set['input_data']['num_AGV'] + 1):
+            self.optimize_engine.visualize_result(k)
             
 
 if __name__ == "__main__":

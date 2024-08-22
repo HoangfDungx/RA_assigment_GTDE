@@ -28,3 +28,23 @@ class Transportation:
                 return i
             
         return -1
+    
+
+class AGV:
+    def __init__(self, color) -> None:
+        self.transportation_set = []
+        self.empty_trip_set = []
+        self.color = color
+
+    def add_transportation(self, machine, job, start_time):
+        self.transportation_set.append([machine, job, start_time])
+
+    def schedule_empty_trip(self):
+        self.transportation_set.sort(key= lambda trans: trans[2])
+        for i in range(len(self.transportation_set) - 1):
+
+            new_empty_trip = [self.transportation_set[i][0], self.transportation_set[i][1], \
+                              self.transportation_set[i + 1][0], self.transportation_set[i + 1][1]]
+            self.empty_trip_set.append(new_empty_trip)
+        
+        pass
