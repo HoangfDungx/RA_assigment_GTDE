@@ -302,6 +302,7 @@ class MILPOptimizer:
                                 x1=a, x2=b, color='gray', alpha=0.3, edgecolor='black')
             plt.text((a + b) / 2, i, f"Job {j}",ha="center", va="center", fontsize=10)
 
+
     def create_legend(self):
         legends = []
         legends.append(Patch(facecolor='gray', edgecolor='black', alpha=0.3, \
@@ -315,3 +316,22 @@ class MILPOptimizer:
                                   label=f'Empty trip by AGV {k}', linestyle="--"))
 
         plt.legend(handles=legends, loc='lower right')
+
+    
+    def log_result(self):
+        print(" ====================== RESULT ======================")
+        print(f" - Objective value (makespan): {self.Cmax.X}")
+        print(f" - Starting time of the all operations: ")
+
+        for i in range(1, len(self.operation_set)):
+            print(f" - - Machine {i}: ")
+            for j in range(1, len(self.operation_set[i])):
+                print(f" - - - Job {j}: {self.operation_set[i][j].start_time.X}")
+
+        print(f" - AGV tasks and starting time of the all transportation: ")
+
+        for i in range(2, len(self.transportation_set)):
+            print(f" - - Machine {i}: ")
+            for j in range(1, len(self.transportation_set[i])):
+                print(f" - - - Job {j} by AGV {self.transportation_set[i][j].getAGV()}: \
+                      {self.transportation_set[i][j].start_time.X}")
