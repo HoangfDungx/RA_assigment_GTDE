@@ -1,0 +1,5 @@
+num_job: 4
+num_machine: 6
+num_AGV: 2
+
+AGV_color: ['blue', 'red']  # To visual AGV task
